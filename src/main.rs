@@ -29,7 +29,7 @@ fn main() {
         let result = BufReader::new(stdin.lock())
             .lines()
             .collect::<Result<Vec<_>>>()
-            .unwrap();
+            .expect("failed to read from stdin");
         result
     };
 
@@ -44,7 +44,7 @@ fn main() {
         }
     };
 
-    for line in result.unwrap() {
+    for line in result.expect("no viable subsets found") {
         println!("{}", line);
     }
 }
@@ -66,16 +66,16 @@ impl Searcher {
     }
 
     fn test(&mut self, test_lines: &[String]) -> bool {
-        let mut child = self.command.spawn().unwrap();
+        let mut child = self.command.spawn().expect("could not spawn child process");
         {
             let mut child_stdin = child.stdin.take().unwrap();
             for line in test_lines {
                 child_stdin
                     .write_all((line.clone() + "\n").as_bytes())
-                    .unwrap();
+                    .expect("failed to write to process stdin");
             }
         }
-        child.wait().unwrap().success()
+        child.wait().expect("process did not finish").success()
     }
 }
 
