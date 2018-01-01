@@ -38,7 +38,7 @@ fn main() {
             let mut command = to_command(c);
             command.stdin(Stdio::piped());
 
-            maximal(lines.clone(), |test_lines| {
+            maximal(lines, |test_lines| {
                 let mut child = command.spawn().unwrap();
                 {
                     let child_stdin = child.stdin.as_mut().unwrap();
