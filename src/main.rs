@@ -35,38 +35,12 @@ fn main() {
 
     let result = match sub_search {
         SubSrch::Maximal { test_command: c } => {
-            let mut command = to_command(c);
-            command.stdin(Stdio::piped());
-
-            maximal(lines, |test_lines| {
-                let mut child = command.spawn().unwrap();
-                {
-                    let child_stdin = child.stdin.as_mut().unwrap();
-                    for line in test_lines {
-                        child_stdin
-                            .write_all((line.clone() + "\n").as_bytes())
-                            .unwrap();
-                    }
-                }
-                child.wait().unwrap().success()
-            })
+            let mut searcher = Searcher::from_str(c);
+            maximal(lines, |test_lines| searcher.test(test_lines))
         }
         SubSrch::Minimal { test_command: c } => {
-            let mut command = to_command(c);
-            command.stdin(Stdio::piped());
-
-            minimal(lines, |test_lines| {
-                let mut child = command.spawn().unwrap();
-                {
-                    let child_stdin = child.stdin.as_mut().unwrap();
-                    for line in test_lines {
-                        child_stdin
-                            .write_all((line.clone() + "\n").as_bytes())
-                            .unwrap();
-                    }
-                }
-                child.wait().unwrap().success()
-            })
+            let mut searcher = Searcher::from_str(c);
+            minimal(lines, |test_lines| searcher.test(test_lines))
         }
     };
 
@@ -75,12 +49,34 @@ fn main() {
     }
 }
 
-fn to_command(s: Vec<String>) -> Command {
-    let mut iter = s.into_iter();
-    let cmd = iter.next().unwrap();
-    let mut c = Command::new(cmd);
-    c.args(&iter.collect::<Vec<_>>());
-    c
+struct Searcher {
+    command: Command,
+}
+
+impl Searcher {
+    fn from_str(s: Vec<String>) -> Searcher {
+        let mut iter = s.into_iter();
+        let cmd = iter.next().unwrap();
+
+        let mut c = Command::new(cmd);
+        c.args(&iter.collect::<Vec<_>>());
+        c.stdin(Stdio::piped());
+
+        Searcher { command: c }
+    }
+
+    fn test(&mut self, test_lines: &[String]) -> bool {
+        let mut child = self.command.spawn().unwrap();
+        {
+            let mut child_stdin = child.stdin.take().unwrap();
+            for line in test_lines {
+                child_stdin
+                    .write_all((line.clone() + "\n").as_bytes())
+                    .unwrap();
+            }
+        }
+        child.wait().unwrap().success()
+    }
 }
 
 fn maximal<T, F>(full: Vec<T>, mut test: F) -> Option<Vec<T>>
