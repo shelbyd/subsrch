@@ -4,6 +4,8 @@ extern crate structopt_derive;
 
 use std::collections::*;
 use std::iter::*;
+use std::io::*;
+use std::process::*;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -21,19 +23,56 @@ enum SubSrch {
 
 fn main() {
     let sub_search = SubSrch::from_args();
+
+    let lines = {
+        let stdin = stdin();
+        let result = BufReader::new(stdin.lock())
+            .lines()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        result
+    };
+
     match sub_search {
         SubSrch::Maximal { test_command: c } => {
             println!("{}", c);
         }
         SubSrch::Minimal { test_command: c } => {
-            println!("{}", c);
+            let mut command = to_command(c);
+            command.stdin(Stdio::piped());
+
+            let result = minimal(lines, |test_lines| {
+                let mut child = command.spawn().unwrap();
+                {
+                    let child_stdin = child.stdin.as_mut().unwrap();
+                    for line in test_lines {
+                        child_stdin
+                            .write_all((line.clone() + "\n").as_bytes())
+                            .unwrap();
+                    }
+                }
+                child.wait().unwrap().success()
+            });
+
+            for line in result.unwrap() {
+                println!("{}", line);
+            }
         }
     }
 }
 
-fn minimal<T>(full: Vec<T>, test: fn(&[T]) -> bool) -> Option<Vec<T>>
+fn to_command(s: String) -> Command {
+    let mut iter = s.split(" ");
+    let cmd = iter.next().unwrap();
+    let mut c = Command::new(cmd);
+    c.args(&iter.collect::<Vec<_>>());
+    c
+}
+
+fn minimal<T, F>(full: Vec<T>, mut test: F) -> Option<Vec<T>>
 where
     T: Clone,
+    F: FnMut(&[T]) -> bool,
 {
     let mut reject_range = RejectRange::new(full.len());
     loop {
@@ -107,11 +146,9 @@ impl RejectRange {
 
     fn next(&self) -> RangeNext {
         match (self.passed.as_ref(), self.failures.len()) {
-            (Some(passed), _) => {
-                self.next_indices()
-                    .map(RunTest)
-                    .unwrap_or_else(|| Done(Some(passed.clone())))
-            }
+            (Some(passed), _) => self.next_indices()
+                .map(RunTest)
+                .unwrap_or_else(|| Done(Some(passed.clone()))),
             (None, 0) => RunTest((0..self.initial_len).collect()),
             (None, _) => Done(None),
         }
