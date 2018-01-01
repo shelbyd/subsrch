@@ -11,12 +11,19 @@ enum SubSrch {
     Maximal {
         #[structopt(help = "Test command.")] test_command: String,
     },
+    #[structopt(name = "minimal", about = "Find the smallest subset that passes the test.")]
+    Minimal {
+        #[structopt(help = "Test command.")] test_command: String,
+    },
 }
 
 fn main() {
     let sub_search = SubSrch::from_args();
     match sub_search {
         SubSrch::Maximal { test_command: c } => {
+            println!("{}", c);
+        }
+        SubSrch::Minimal { test_command: c } => {
             println!("{}", c);
         }
     }
