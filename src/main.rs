@@ -13,11 +13,11 @@ use structopt::StructOpt;
 enum SubSrch {
     #[structopt(name = "maximal", about = "Find the largest subset that passes the test.")]
     Maximal {
-        #[structopt(help = "Test command.")] test_command: String,
+        #[structopt(help = "Test command.")] test_command: Vec<String>,
     },
     #[structopt(name = "minimal", about = "Find the smallest subset that passes the test.")]
     Minimal {
-        #[structopt(help = "Test command.")] test_command: String,
+        #[structopt(help = "Test command.")] test_command: Vec<String>,
     },
 }
 
@@ -75,8 +75,8 @@ fn main() {
     }
 }
 
-fn to_command(s: String) -> Command {
-    let mut iter = s.split(" ");
+fn to_command(s: Vec<String>) -> Command {
+    let mut iter = s.into_iter();
     let cmd = iter.next().unwrap();
     let mut c = Command::new(cmd);
     c.args(&iter.collect::<Vec<_>>());
