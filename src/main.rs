@@ -11,6 +11,8 @@ macro_rules! set {
     }}
 }
 
+mod indices;
+
 mod maximal;
 use self::maximal::*;
 

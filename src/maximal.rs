@@ -1,3 +1,4 @@
+use indices::*;
 use std::collections::*;
 use std::iter::*;
 
@@ -9,9 +10,9 @@ where
     let mut reject_range = RejectRange::new(full.len());
     loop {
         match reject_range.next() {
-            Done(o) => return o.map(|indices| reject_indices(&full, &indices)),
+            Done(o) => return o.map(|indices| full.reject_indices(&indices)),
             RunTest(indices) => {
-                if test(&reject_indices(&full, &indices)) {
+                if test(&full.clone().reject_indices(&indices)) {
                     reject_range.test_passed(indices);
                 } else {
                     reject_range.test_failed(indices);
@@ -21,21 +22,9 @@ where
     }
 }
 
-fn reject_indices<T>(list: &[T], indices: &HashSet<usize>) -> Vec<T>
-where
-    T: Clone,
-{
-    list.iter()
-        .enumerate()
-        .filter(|&(i, _)| !indices.contains(&i))
-        .map(|(_, t)| t)
-        .cloned()
-        .collect()
-}
-
 struct RejectRange {
-    passed: Option<HashSet<usize>>,
-    failures: Vec<HashSet<usize>>,
+    passed: Option<Indices>,
+    failures: Vec<Indices>,
     initial_len: usize,
 }
 
@@ -48,7 +37,7 @@ impl RejectRange {
         }
     }
 
-    fn test_passed(&mut self, included_indices: HashSet<usize>) {
+    fn test_passed(&mut self, included_indices: Indices) {
         self.passed = Some(match self.passed.take() {
             None => included_indices,
             Some(p) => {
@@ -63,7 +52,7 @@ impl RejectRange {
         self.failures.retain(|f| f.is_subset(passed));
     }
 
-    fn test_failed(&mut self, included_indices: HashSet<usize>) {
+    fn test_failed(&mut self, included_indices: Indices) {
         self.failures.push(included_indices);
     }
 
@@ -77,7 +66,7 @@ impl RejectRange {
         }
     }
 
-    fn next_indices(&self) -> Option<HashSet<usize>> {
+    fn next_indices(&self) -> Option<Indices> {
         let passed = self.passed.as_ref().unwrap();
         let past_rejects: Vec<_> = once(set![])
             .chain(self.failures.iter().map(|f| passed - f))
@@ -101,8 +90,8 @@ impl RejectRange {
 
 #[derive(PartialEq, Eq, Debug)]
 enum RangeNext {
-    RunTest(HashSet<usize>),
-    Done(Option<HashSet<usize>>),
+    RunTest(Indices),
+    Done(Option<Indices>),
 }
 use self::RangeNext::*;
 
