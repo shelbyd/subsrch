@@ -33,15 +33,12 @@ fn main() {
         result
     };
 
-    match sub_search {
+    let result = match sub_search {
         SubSrch::Maximal { test_command: c } => {
-            println!("{}", c);
-        }
-        SubSrch::Minimal { test_command: c } => {
             let mut command = to_command(c);
             command.stdin(Stdio::piped());
 
-            let result = minimal(lines, |test_lines| {
+            maximal(lines.clone(), |test_lines| {
                 let mut child = command.spawn().unwrap();
                 {
                     let child_stdin = child.stdin.as_mut().unwrap();
@@ -52,12 +49,29 @@ fn main() {
                     }
                 }
                 child.wait().unwrap().success()
-            });
-
-            for line in result.unwrap() {
-                println!("{}", line);
-            }
+            })
         }
+        SubSrch::Minimal { test_command: c } => {
+            let mut command = to_command(c);
+            command.stdin(Stdio::piped());
+
+            minimal(lines, |test_lines| {
+                let mut child = command.spawn().unwrap();
+                {
+                    let child_stdin = child.stdin.as_mut().unwrap();
+                    for line in test_lines {
+                        child_stdin
+                            .write_all((line.clone() + "\n").as_bytes())
+                            .unwrap();
+                    }
+                }
+                child.wait().unwrap().success()
+            })
+        }
+    };
+
+    for line in result.unwrap() {
+        println!("{}", line);
     }
 }
 
@@ -67,6 +81,38 @@ fn to_command(s: String) -> Command {
     let mut c = Command::new(cmd);
     c.args(&iter.collect::<Vec<_>>());
     c
+}
+
+fn maximal<T, F>(full: Vec<T>, mut test: F) -> Option<Vec<T>>
+where
+    T: Clone,
+    F: FnMut(&[T]) -> bool,
+{
+    let mut reject_range = RejectRange::new(full.len());
+    loop {
+        match reject_range.next() {
+            Done(o) => return o.map(|indices| reject_indices(&full, &indices)),
+            RunTest(indices) => {
+                if test(&reject_indices(&full, &indices)) {
+                    reject_range.test_passed(indices);
+                } else {
+                    reject_range.test_failed(indices);
+                }
+            }
+        }
+    }
+}
+
+fn reject_indices<T>(list: &[T], indices: &HashSet<usize>) -> Vec<T>
+where
+    T: Clone,
+{
+    list.iter()
+        .enumerate()
+        .filter(|&(i, _)| !indices.contains(&i))
+        .map(|(_, t)| t)
+        .cloned()
+        .collect()
 }
 
 fn minimal<T, F>(full: Vec<T>, mut test: F) -> Option<Vec<T>>
