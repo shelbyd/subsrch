@@ -19,6 +19,8 @@ use self::maximal::*;
 mod minimal;
 use self::minimal::*;
 
+mod range;
+
 mod searcher;
 use self::searcher::*;
 
@@ -53,12 +55,10 @@ fn main() {
 
     let result = match sub_search {
         SubSrch::Maximal { test_command: c } => {
-            let mut searcher = Searcher::from_str(c);
-            maximal(lines, |test_lines| searcher.test(test_lines))
+            Searcher::from_str(c).search::<MaximalRange>(lines)
         }
         SubSrch::Minimal { test_command: c } => {
-            let mut searcher = Searcher::from_str(c);
-            minimal(lines, |test_lines| searcher.test(test_lines))
+            Searcher::from_str(c).search::<MinimalRange>(lines)
         }
     };
 

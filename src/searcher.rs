@@ -1,3 +1,5 @@
+use indices::*;
+use range::*;
 use std::io::*;
 use std::process::*;
 
@@ -28,5 +30,24 @@ impl Searcher {
             }
         }
         child.wait().expect("process did not finish").success()
+    }
+
+    pub fn search<R>(&mut self, full: Vec<String>) -> Option<Vec<String>>
+    where
+        R: Range,
+    {
+        let mut range = R::new(full.len());
+        loop {
+            match range.next() {
+                Done(o) => return o.map(|indices| full.select_indices(&indices)),
+                RunTest(indices) => {
+                    if self.test(&full.clone().select_indices(&indices)) {
+                        range.test_passed(indices);
+                    } else {
+                        range.test_failed(indices);
+                    }
+                }
+            }
+        }
     }
 }

@@ -1,36 +1,17 @@
 use indices::*;
+use range::*;
 use std::collections::*;
 use std::iter::*;
 
-pub fn maximal<T, F>(full: Vec<T>, mut test: F) -> Option<Vec<T>>
-where
-    T: Clone,
-    F: FnMut(&[T]) -> bool,
-{
-    let mut reject_range = RejectRange::new(full.len());
-    loop {
-        match reject_range.next() {
-            Done(o) => return o.map(|indices| full.select_indices(&indices)),
-            RunTest(indices) => {
-                if test(&full.clone().select_indices(&indices)) {
-                    reject_range.test_passed(indices);
-                } else {
-                    reject_range.test_failed(indices);
-                }
-            }
-        }
-    }
-}
-
-struct RejectRange {
+pub struct MaximalRange {
     passed: Option<Indices>,
     failures: Vec<Indices>,
     initial_len: usize,
 }
 
-impl RejectRange {
-    fn new(list_len: usize) -> RejectRange {
-        RejectRange {
+impl Range for MaximalRange {
+    fn new(list_len: usize) -> MaximalRange {
+        MaximalRange {
             passed: None,
             failures: vec![],
             initial_len: list_len,
@@ -65,7 +46,9 @@ impl RejectRange {
             (None, _) => Done(None),
         }
     }
+}
 
+impl MaximalRange {
     fn next_indices(&self) -> Option<Indices> {
         let passed = self.passed.as_ref().unwrap();
         let past_includes: Vec<_> = once(set![])
@@ -92,162 +75,104 @@ impl RejectRange {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
-enum RangeNext {
-    RunTest(Indices),
-    Done(Option<Indices>),
-}
-use self::RangeNext::*;
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[cfg(test)]
-    mod maximal {
-        use super::*;
+    #[test]
+    fn empty_list_should_test_once() {
+        let range = MaximalRange::new(0);
 
-        #[test]
-        fn empty_passes_is_empty() {
-            assert_eq!(maximal(vec![], |_: &[u8]| true), Some(vec![]));
-        }
-
-        #[test]
-        fn empty_fails_is_none() {
-            assert_eq!(maximal(vec![], |_: &[u8]| false), None);
-        }
-
-        #[test]
-        fn requires_empty() {
-            assert_eq!(maximal(vec![0], |v| v.is_empty()), Some(vec![]));
-        }
-
-        #[test]
-        fn rejects_first_item() {
-            assert_eq!(maximal(vec![0, 1], |v| !v.contains(&0)), Some(vec![1]));
-        }
-
-        #[test]
-        fn rejects_second_item() {
-            assert_eq!(maximal(vec![0, 1], |v| !v.contains(&1)), Some(vec![0]));
-        }
-
-        #[test]
-        fn two_elements_requires_empty() {
-            assert_eq!(
-                maximal(vec![0, 1], |v| v.is_empty()),
-                Some(vec![])
-            );
-        }
-
-        #[test]
-        fn rejects_first_and_last() {
-            assert_eq!(
-                maximal(vec![0, 1, 2, 3], |v| !v.contains(&0) && !v.contains(&3)),
-                Some(vec![1, 2])
-            );
-        }
+        assert_eq!(range.next(), RunTest(set![]));
     }
 
-    #[cfg(test)]
-    mod reject_range {
-        use super::*;
+    #[test]
+    fn empty_list_failed_test_final_range_is_none() {
+        let mut range = MaximalRange::new(0);
 
-        #[test]
-        fn empty_list_should_test_once() {
-            let range = RejectRange::new(0);
+        range.test_failed(set![]);
+        assert_eq!(range.next(), Done(None));
+    }
 
-            assert_eq!(range.next(), RunTest(set![]));
-        }
+    #[test]
+    fn empty_list_passed_test_final_range_is_empty() {
+        let mut range = MaximalRange::new(0);
 
-        #[test]
-        fn empty_list_failed_test_final_range_is_none() {
-            let mut range = RejectRange::new(0);
+        range.test_passed(set![]);
+        assert_eq!(range.next(), Done(Some(set![])));
+    }
 
-            range.test_failed(set![]);
-            assert_eq!(range.next(), Done(None));
-        }
+    #[test]
+    fn single_element_is_test_empty() {
+        let range = MaximalRange::new(1);
 
-        #[test]
-        fn empty_list_passed_test_final_range_is_empty() {
-            let mut range = RejectRange::new(0);
+        assert_eq!(range.next(), RunTest(set![]));
+    }
 
-            range.test_passed(set![]);
-            assert_eq!(range.next(), Done(Some(set![])));
-        }
+    #[test]
+    fn single_element_failed_is_empty_set() {
+        let mut range = MaximalRange::new(1);
 
-        #[test]
-        fn single_element_is_test_empty() {
-            let range = RejectRange::new(1);
+        range.test_passed(set![]);
+        range.test_failed(set![0]);
+        assert_eq!(range.next(), Done(Some(set![])));
+    }
 
-            assert_eq!(range.next(), RunTest(set![]));
-        }
+    #[test]
+    fn single_element_passed_test_is_done() {
+        let mut range = MaximalRange::new(1);
 
-        #[test]
-        fn single_element_failed_is_empty_set() {
-            let mut range = RejectRange::new(1);
+        range.test_passed(set![0]);
+        assert_eq!(range.next(), Done(Some(set![0])));
+    }
 
-            range.test_passed(set![]);
-            range.test_failed(set![0]);
-            assert_eq!(range.next(), Done(Some(set![])));
-        }
+    #[test]
+    fn two_elements_failed() {
+        let mut range = MaximalRange::new(2);
 
-        #[test]
-        fn single_element_passed_test_is_done() {
-            let mut range = RejectRange::new(1);
+        range.test_failed(set![]);
+        assert_eq!(range.next(), Done(None));
+    }
 
-            range.test_passed(set![0]);
-            assert_eq!(range.next(), Done(Some(set![0])));
-        }
+    #[test]
+    fn two_elements_only_one() {
+        let mut range = MaximalRange::new(2);
 
-        #[test]
-        fn two_elements_failed() {
-            let mut range = RejectRange::new(2);
+        range.test_passed(set![0]);
+        range.test_failed(set![0, 1]);
+        assert_eq!(range.next(), Done(Some(set![0])));
+    }
 
-            range.test_failed(set![]);
-            assert_eq!(range.next(), Done(None));
-        }
+    #[test]
+    fn two_elements_first_required() {
+        let mut range = MaximalRange::new(2);
 
-        #[test]
-        fn two_elements_only_one() {
-            let mut range = RejectRange::new(2);
+        range.test_passed(set![]);
+        range.test_failed(set![0, 1]);
+        range.test_failed(set![1]);
+        assert_eq!(range.next(), RunTest(set![0]));
+    }
 
-            range.test_passed(set![0]);
-            range.test_failed(set![0, 1]);
-            assert_eq!(range.next(), Done(Some(set![0])));
-        }
+    #[test]
+    fn ignores_smaller_passes() {
+        let mut range = MaximalRange::new(2);
 
-        #[test]
-        fn two_elements_first_required() {
-            let mut range = RejectRange::new(2);
+        range.test_passed(set![0, 1]);
+        range.test_passed(set![1]);
+        assert_eq!(range.next(), Done(Some(set![0, 1])));
+    }
 
-            range.test_passed(set![]);
-            range.test_failed(set![0, 1]);
-            range.test_failed(set![1]);
-            assert_eq!(range.next(), RunTest(set![0]));
-        }
+    #[test]
+    fn four_elements_rejects_middle_two() {
+        let mut range = MaximalRange::new(4);
 
-        #[test]
-        fn ignores_smaller_passes() {
-            let mut range = RejectRange::new(2);
-
-            range.test_passed(set![0, 1]);
-            range.test_passed(set![1]);
-            assert_eq!(range.next(), Done(Some(set![0, 1])));
-        }
-
-        #[test]
-        fn four_elements_rejects_middle_two() {
-            let mut range = RejectRange::new(4);
-
-            range.test_passed(set![]);
-            range.test_failed(set![0, 1, 2, 3]);
-            range.test_failed(set![0, 1]);
-            range.test_failed(set![2, 3]);
-            match range.next() {
-                RunTest(v) => assert!(v.len() == 1, "{:?} should have length 1", v),
-                _ => assert!(false),
-            }
+        range.test_passed(set![]);
+        range.test_failed(set![0, 1, 2, 3]);
+        range.test_failed(set![0, 1]);
+        range.test_failed(set![2, 3]);
+        match range.next() {
+            RunTest(v) => assert!(v.len() == 1, "{:?} should have length 1", v),
+            _ => assert!(false),
         }
     }
 }
