@@ -34,9 +34,9 @@ impl Searcher {
 
     pub fn search<R>(&mut self, full: Vec<String>) -> Option<Vec<String>>
     where
-        R: Range,
+        R: RangeStrategy,
     {
-        let mut range = R::new(full.len());
+        let mut range = Range::<R>::new(full.len());
         loop {
             match range.next() {
                 Done(o) => return o.map(|indices| full.select_indices(&indices)),

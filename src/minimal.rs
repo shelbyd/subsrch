@@ -3,56 +3,22 @@ use range::*;
 use std::collections::*;
 use std::iter::*;
 
-pub struct MinimalRange {
-    passed: Option<Indices>,
-    failures: Vec<Indices>,
-    initial_len: usize,
-}
+pub struct MinimalRange;
 
-impl Range for MinimalRange {
-    fn new(list_len: usize) -> MinimalRange {
-        MinimalRange {
-            passed: None,
-            failures: vec![],
-            initial_len: list_len,
-        }
+impl RangeStrategy for MinimalRange {
+    fn retain_indices(passed: &Indices, new_indices: &Indices) -> bool {
+        new_indices.is_subset(passed)
     }
 
-    fn test_passed(&mut self, included_indices: Indices) {
-        self.passed = Some(match self.passed.take() {
-            None => included_indices,
-            Some(p) => {
-                if included_indices.is_subset(&p) {
-                    included_indices
-                } else {
-                    p
-                }
-            }
-        });
-        let passed = self.passed.as_ref().unwrap();
-        self.failures.retain(|f| f.is_subset(passed));
+    fn initial_test(range: &Range<Self>) -> Indices {
+        (0..range.initial_len).collect()
     }
 
-    fn test_failed(&mut self, included_indices: Indices) {
-        self.failures.push(included_indices);
-    }
-
-    fn next(&self) -> RangeNext {
-        match (self.passed.as_ref(), self.failures.len()) {
-            (Some(passed), _) => self.next_indices()
-                .map(RunTest)
-                .unwrap_or_else(|| Done(Some(passed.clone()))),
-            (None, 0) => RunTest((0..self.initial_len).collect()),
-            (None, _) => Done(None),
-        }
-    }
-}
-
-impl MinimalRange {
-    fn next_indices(&self) -> Option<Indices> {
-        let passed = self.passed.as_ref().unwrap();
+    // TODO(shelbyd): Reduce duplication in this method.
+    fn next_indices(range: &Range<Self>) -> Option<Indices> {
+        let passed = range.passed.as_ref().unwrap();
         let past_rejects: Vec<_> = once(set![])
-            .chain(self.failures.iter().map(|f| passed - f))
+            .chain(range.failures.iter().map(|f| passed - f))
             .collect();
         let potential_rejects = once(passed)
             .chain(past_rejects.iter())
