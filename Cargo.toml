@@ -1,7 +1,9 @@
 [package]
 name = "subsrch"
+description = "Find maximal or minimal subsets that succeed a given command"
 version = "0.1.0"
 authors = ["Shelby Doolittle <shelby@shelbyd.com>"]
+license = "MIT"
 
 [dependencies]
 structopt = "0.1.0"
